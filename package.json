@@ -1,19 +1,25 @@
 {
-  "name": "backend",
+  "name": "xor-backend",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "XOR Code Collaboration Backend",
+  "main": "src/server.cjs",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-     "start": "node src/server.cjs",
-     "dev": "nodemon src/server.cjs"
+    "start": "node src/server.cjs",
+    "dev": "nodemon src/server.cjs"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "packageManager": "pnpm@10.8.0",
   "dependencies": {
-    "express": "^5.1.0",
-    "nodemon": "^3.1.9"
+    "express": "^4.18.2",
+    "socket.io": "^4.7.4",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
