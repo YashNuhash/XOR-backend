@@ -33,65 +33,85 @@ io.on("connection", (socket) => {
 
   // Handle joining a room
   socket.on("joinRoom", (data) => {
-    if (!data || typeof data !== "object" || !data.roomId || !data.name) {
-      console.error("Invalid joinRoom payload:", data);
-      return;
-    }
+    try {
+      if (!data || typeof data !== "object" || !data.roomId || !data.name) {
+        console.error("Invalid joinRoom payload:", data);
+        return;
+      }
 
-    const { roomId, name } = data;
+      const { roomId, name } = data;
+      console.log(`${name} attempting to join room ${roomId}`);
 
-    if (!rooms[roomId]) {
-      rooms[roomId] = [];
-      roomCode[roomId] = ""; // Initialize room code as empty
-      roomProfiles[roomId] = {}; // Initialize profiles for the room
-    }
+      if (!rooms[roomId]) {
+        rooms[roomId] = [];
+        roomCode[roomId] = ""; // Initialize room code as empty
+        roomProfiles[roomId] = {}; // Initialize profiles for the room
+        console.log(`Created new room: ${roomId}`);
+      }
 
-    // Join the socket.io room first
-    socket.join(roomId);
+      // Join the socket.io room
+      socket.join(roomId);
+      console.log(`Socket ${socket.id} joined room ${roomId}`);
 
-    // Check if the user is already in the room
-    const isUserInRoom = rooms[roomId].some((user) => user.name === name);
-    if (!isUserInRoom) {
-      const peopleId = (rooms[roomId].length % 4) + 1;
-      const newUser = { id: socket.id, name, peopleId };
+      // Check if the user is already in the room
+      const isUserInRoom = rooms[roomId].some((user) => user.name === name);
+      if (!isUserInRoom) {
+        const peopleId = (rooms[roomId].length % 4) + 1;
+        const newUser = { id: socket.id, name, peopleId };
 
-      rooms[roomId].push(newUser);
-      roomProfiles[roomId][socket.id] = { name, peopleId }; // Store profile data
+        rooms[roomId].push(newUser);
+        roomProfiles[roomId][socket.id] = { name, peopleId };
 
-      // Ensure profiles are updated before broadcasting
-      io.to(roomId).emit("updateRoom", rooms[roomId]);
-      io.to(roomId).emit("updateProfiles", roomProfiles[roomId]); // Send updated profiles
+        // Send updates to all clients in the room
+        io.to(roomId).emit("updateRoom", rooms[roomId]);
+        io.to(roomId).emit("updateProfiles", roomProfiles[roomId]);
 
-      // Send the current room data and code to the newly connected client
-      socket.emit("updateRoom", rooms[roomId]);
-      socket.emit("updateProfiles", roomProfiles[roomId]); // Send profiles to the new user
-      socket.emit("codeUpdate", roomCode[roomId]);
-
-      console.log(`${name} joined room ${roomId}`);
-    } else {
-      // If the user is already in the room, send the current room data and profiles
-      socket.emit("updateRoom", rooms[roomId]);
-      socket.emit("updateProfiles", roomProfiles[roomId]);
-      socket.emit("codeUpdate", roomCode[roomId]);
+        // Send current code to the new user
+        socket.emit("codeUpdate", roomCode[roomId]);
+        console.log(`${name} successfully joined room ${roomId}`);
+      } else {
+        socket.emit("updateRoom", rooms[roomId]);
+        socket.emit("updateProfiles", roomProfiles[roomId]);
+        socket.emit("codeUpdate", roomCode[roomId]);
+        console.log(`${name} rejoined room ${roomId}`);
+      }
+    } catch (error) {
+      console.error("Error in joinRoom:", error);
     }
   });
 
   // Handle code changes
   socket.on("codeChange", ({ roomId, code }) => {
-    if (roomCode[roomId] !== undefined) {
-      roomCode[roomId] = code; // Update the room's code
-      socket.to(roomId).emit("codeUpdate", code); // Broadcast the updated code to others in the room
+    try {
+      if (roomCode[roomId] !== undefined) {
+        console.log(`Code updated in room ${roomId}`);
+        roomCode[roomId] = code;
+        socket.to(roomId).emit("codeUpdate", code);
+      } else {
+        console.error(`Room ${roomId} not found for code change`);
+      }
+    } catch (error) {
+      console.error("Error in codeChange:", error);
     }
   });
 
   // Handle disconnect
   socket.on("disconnect", () => {
-    for (const roomId in rooms) {
-      rooms[roomId] = rooms[roomId].filter((user) => user.id !== socket.id);
-      delete roomProfiles[roomId][socket.id]; // Remove profile data
+    try {
+      for (const roomId in rooms) {
+        const userIndex = rooms[roomId].findIndex((user) => user.id === socket.id);
+        if (userIndex !== -1) {
+          const user = rooms[roomId][userIndex];
+          console.log(`${user.name} disconnected from room ${roomId}`);
+          rooms[roomId].splice(userIndex, 1);
+          delete roomProfiles[roomId][socket.id];
 
-      io.to(roomId).emit("updateRoom", rooms[roomId]);
-      io.to(roomId).emit("updateProfiles", roomProfiles[roomId]); // Send updated profiles
+          io.to(roomId).emit("updateRoom", rooms[roomId]);
+          io.to(roomId).emit("updateProfiles", roomProfiles[roomId]);
+        }
+      }
+    } catch (error) {
+      console.error("Error in disconnect:", error);
     }
     console.log("A user disconnected:", socket.id);
   });
